@@ -4,7 +4,7 @@ This is a comprehensive, multi-level menu system for an ESP32, using a 128x64 SS
 
 This was a passion project that involved over 8 hours of coding, 2 days of UI/UX planning, and debugging over 400 lines of code to create a responsive and intuitive user experience.
 
-*(Optional: Add a GIF or video of your project in action here!)*
+https://www.linkedin.com/posts/iftikar-ju-etce_esp32-embeddedsystems-oled-activity-7386785487140859904-PD82?utm_source=share&utm_medium=member_desktop&rcm=ACoAAFehdUwBalCtYFh_MA3MIl1WJ41eG5qRr-4
 
 ---
 
