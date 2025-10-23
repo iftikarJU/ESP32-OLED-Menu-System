@@ -1,308 +1,86 @@
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+# ESP32-OLED-Menu-System
 
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+This is a comprehensive, multi-level menu system for an ESP32, using a 128x64 SSD1306 OLED display and three push-buttons for navigation. It's designed as a robust template for controlling various outputs (like LEDs) through a clean, non-blocking interface.
 
-// --- PIN DEFINITIONS ---
-#define BLUE_LED   2
-#define GREEN_LED  4
-#define ORANGE_LED 18
-#define RED_LED    19
+This was a passion project that involved over 8 hours of coding, 2 days of UI/UX planning, and debugging over 400 lines of code to create a responsive and intuitive user experience.
 
-const int buttonPin1 = 27; // NEXT
-const int buttonPin2 = 14; // PREVIOUS / BACK
-const int buttonPin3 = 12; // ENTER
+https://www.linkedin.com/posts/iftikar-ju-etce_esp32-embeddedsystems-oled-activity-7386785487140859904-PD82?utm_source=share&utm_medium=member_desktop&rcm=ACoAAFehdUwBalCtYFh_MA3MIl1WJ41eG5qRr-4
 
-// --- BUTTON STATE VARIABLES ---
-int B1State = HIGH, lastB1State = HIGH;
-int B2State = HIGH, lastB2State = HIGH;
-int B3State = HIGH, lastB3State = HIGH;
+---
 
-// --- MENU STATE VARIABLES ---
-int menuIndex = 0;
-int subMenuIndex = -1;
-int subSubMenuIndex = -1;
+## Features
 
-// --- MENU ITEM COUNTS ---
-const int totalMenus = 3;
-const int totalSubMenus = 4;
+* **Multi-Level Menu:** A clean state-machine logic allows for a Main Menu, Sub-Menus, and Action screens.
+* **3-Button Navigation:** Simple and intuitive "Next," "Previous/Back," and "Enter" controls.
+* **Non-Blocking Code:** The `handleActiveActions()` function runs animations and blinking using `millis()`, ensuring the user interface is always responsive.
+* **Splash Screen:** A custom "WELCOME" message on startup.
+* **Multiple LED Control Modes:**
+    * **Blink:** Make a selected LED blink at a set interval.
+    * **Toggle:** Turn a selected LED on (and off when backing out).
+    * **Animations:** Run one of four pre-programmed animations using all four LEDs:
+        1.  **Scanner:** A "Cylon" or "Knight Rider" style scanner.
+        2.  **Fill Up:** LEDs light up one by one and stay on.
+        3.  **Converge:** LEDs light up from the outside in.
+        4.  **Flash:** All LEDs flash on and off together.
 
-// --- NON-BLOCKING ACTION VARIABLES ---
-unsigned long lastActionTime = 0;
-int animationStep = 0;
-bool blinkState = false;
+---
 
-// === FORWARD DECLARATION ===
-void handleActiveActions();
+## Hardware Required
 
-// === DISPLAY FUNCTIONS (Unchanged) ===
-void showMainMenu(int menuNum) {
-  digitalWrite(BLUE_LED, LOW);
-  digitalWrite(GREEN_LED, LOW);
-  digitalWrite(ORANGE_LED, LOW);
-  digitalWrite(RED_LED, LOW);
-  subMenuIndex = -1;
-  subSubMenuIndex = -1;
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println("--- MAIN MENU ---");
-  display.setCursor(20, 15);
-  display.println("Blink LED");
-  display.setCursor(20, 25);
-  display.println("Toggle LED");
-  display.setCursor(20, 35);
-  display.println("Animation LED");
-  switch(menuNum) {
-    case 0: display.setCursor(10, 15); break;
-    case 1: display.setCursor(10, 25); break;
-    case 2: display.setCursor(10, 35); break;
-  }
-  display.println(">");
-  display.display();
-}
+* 1 x ESP32 Development Board
+* 1 x SSD1306 128x64 I2C OLED Display
+* 4 x 5mm LEDs (Blue, Green, Orange, Red)
+* 3 x Tactile Push-Buttons
+* 4 x 220Ω Resistors (for the LEDs, one for each)
+* 1 x Breadboard
+* Jumper Wires
 
-void showSubMenu(int menuNum, int subMenuNum) {
-  digitalWrite(BLUE_LED, LOW);
-  digitalWrite(GREEN_LED, LOW);
-  digitalWrite(ORANGE_LED, LOW);
-  digitalWrite(RED_LED, LOW);
-  subMenuIndex = subMenuNum;
-  subSubMenuIndex = -1;
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  switch(menuNum) {
-    case 0: display.println("--- Blink LED ---"); break;
-    case 1: display.println("--- Toggle LED ---"); break;
-    case 2: display.println("--- Animation LED ---"); break;
-  }
-  switch(menuNum) {
-    case 0: case 1:
-      display.setCursor(20, 15); display.println("Blue LED");
-      display.setCursor(20, 25); display.println("Green LED");
-      display.setCursor(20, 35); display.println("Orange LED");
-      display.setCursor(20, 45); display.println("Red LED");
-      break;
-    case 2:
-      display.setCursor(20, 15); display.println("Scanner Animation");
-      display.setCursor(20, 25); display.println("Fill Up Animation");
-      display.setCursor(20, 35); display.println("Converge Animation");
-      display.setCursor(20, 45); display.println("Flash Animation");
-      break;
-  }
-  switch(subMenuNum) {
-    case 0: display.setCursor(10, 15); break;
-    case 1: display.setCursor(10, 25); break;
-    case 2: display.setCursor(10, 35); break;
-    case 3: display.setCursor(10, 45); break;
-  }
-  display.println(">");
-  display.display();
-}
+---
 
-void showSubSubMenu(int menuNum, int subMenuNum) {
-  subSubMenuIndex = 0;
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  lastActionTime = millis();
-  animationStep = 0;
-  blinkState = true;
-  display.setCursor(0, 0);
-  display.print("Action: ");
-  switch(menuNum) {
-    case 0: display.println("Blinking"); break;
-    case 1: display.println("Toggling"); break;
-    case 2: display.println("Animation"); break;
-  }
-  if (menuNum == 1) {
-    switch(subMenuNum) {
-      case 0: digitalWrite(BLUE_LED, HIGH); break;
-      case 1: digitalWrite(GREEN_LED, HIGH); break;
-      case 2: digitalWrite(ORANGE_LED, HIGH); break;
-      case 3: digitalWrite(RED_LED, HIGH); break;
-    }
-  }
-  String line1 = "Press Enter";
-  String line2 = "to go Back";
-  int16_t x1, y1;
-  uint16_t w, h;
-  display.getTextBounds(line1, 0, 0, &x1, &y1, &w, &h);
-  display.setCursor((SCREEN_WIDTH - w) / 2, 40);
-  display.println(line1);
-  display.getTextBounds(line2, 0, 0, &x1, &y1, &w, &h);
-  display.setCursor((SCREEN_WIDTH - w) / 2, 52);
-  display.println(line2);
-  display.display();
-}
+## Wiring Diagram
 
-// ==========================================================
-// THIS IS THE CORRECTED AND MORE RELIABLE SETUP FUNCTION
-// ==========================================================
-void setup() {
-  pinMode(BLUE_LED, OUTPUT);
-  pinMode(GREEN_LED, OUTPUT);
-  pinMode(ORANGE_LED, OUTPUT);
-  pinMode(RED_LED, OUTPUT);
-  digitalWrite(BLUE_LED, LOW);
-  digitalWrite(GREEN_LED, LOW);
-  digitalWrite(ORANGE_LED, LOW);
-  digitalWrite(RED_LED, LOW);
+This code uses the default I2C pins for the ESP32.
 
-  pinMode(buttonPin1, INPUT_PULLUP);
-  pinMode(buttonPin2, INPUT_PULLUP);
-  pinMode(buttonPin3, INPUT_PULLUP);
-  Serial.begin(115200);
+| Component | ESP32 Pin |
+| :--- | :--- |
+| **OLED SCL** | GPIO 22 |
+| **OLED SDA** | GPIO 21 |
+| **Blue LED** | GPIO 2 |
+| **Green LED** | GPIO 4 |
+| **Orange LED**| GPIO 18 |
+| **Red LED** | GPIO 19 |
+| **Button 1 (Next)** | GPIO 27 |
+| **Button 2 (Previous)** | GPIO 14 |
+| **Button 3 (Enter)** | GPIO 12 |
 
-  // Give power a moment to stabilize before talking to the display
-  delay(250); 
+**Button Wiring:** The buttons are configured with `INPUT_PULLUP`. Connect one side of each button to its corresponding GPIO pin and the other side to **GND**.
 
-  // Initialize the display. Use the Serial Monitor to check for failure.
-  // If it fails, try changing the I2C address from 0x3C to 0x3D.
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for (;;); // Don't proceed, loop forever
-  }
-  
-  // This sequence "wakes up" the display controller for sure.
-  display.display(); // Send the empty buffer
-  delay(100);
-  display.clearDisplay(); // Clear it again
-  display.display();
-  delay(100);
+---
 
-  // --- SPLASH SCREEN ---
-  // Now, the display is guaranteed to be ready.
-  display.setTextSize(2);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(27, 27);
-  display.println("WELCOME");
-  display.display();
-  delay(2000);
-  
-  // Finally, show the main menu
-  showMainMenu(menuIndex);
-}
+## Software & Libraries
 
-void loop() {
-  B1State = digitalRead(buttonPin1);
-  B2State = digitalRead(buttonPin2);
-  B3State = digitalRead(buttonPin3);
+This project was written in the Arduino C/C++ environment (using the Arduino IDE or PlatformIO).
 
-  if (subSubMenuIndex != -1) {
-    handleActiveActions();
-    if (B3State == LOW && lastB3State == HIGH) {
-      showSubMenu(menuIndex, subMenuIndex);
-      delay(200);
-    }
-  } else if (subMenuIndex != -1) {
-    if (B1State == LOW && lastB1State == HIGH) {
-      subMenuIndex++;
-      if (subMenuIndex >= totalSubMenus) subMenuIndex = 0;
-      showSubMenu(menuIndex, subMenuIndex);
-      delay(200);
-    }
-    if (B2State == LOW && lastB2State == HIGH) {
-      if (subMenuIndex == 0) showMainMenu(menuIndex);
-      else {
-        subMenuIndex--;
-        showSubMenu(menuIndex, subMenuIndex);
-      }
-      delay(200);
-    }
-    if (B3State == LOW && lastB3State == HIGH) {
-      showSubSubMenu(menuIndex, subMenuIndex);
-      delay(200);
-    }
-  } else {
-    if (B1State == LOW && lastB1State == HIGH) {
-      menuIndex++;
-      if (menuIndex >= totalMenus) menuIndex = 0;
-      showMainMenu(menuIndex);
-      delay(200);
-    }
-    if (B2State == LOW && lastB2State == HIGH) {
-      menuIndex--;
-      if (menuIndex < 0) menuIndex = totalMenus - 1;
-      showMainMenu(menuIndex);
-      delay(200);
-    }
-    if (B3State == LOW && lastB3State == HIGH) {
-      showSubMenu(menuIndex, 0);
-      delay(200);
-    }
-  }
+You will need to install the following libraries from the Arduino Library Manager:
+* `Adafruit_GFX`
+* `Adaidfruit_SSD1306`
 
-  lastB1State = B1State;
-  lastB2State = B2State;
-  lastB3State = B3State;
-}
+The `Wire.h` library (for I2C communication) is built-in with the ESP32 core.
 
-void handleActiveActions() {
-  switch (menuIndex) {
-    case 0:
-      if (millis() - lastActionTime > 400) {
-        lastActionTime = millis();
-        blinkState = !blinkState;
-        switch (subMenuIndex) {
-          case 0: digitalWrite(BLUE_LED, blinkState); break;
-          case 1: digitalWrite(GREEN_LED, blinkState); break;
-          case 2: digitalWrite(ORANGE_LED, blinkState); break;
-          case 3: digitalWrite(RED_LED, blinkState); break;
-        }
-      }
-      break;
-    case 2:
-      if (millis() - lastActionTime > 150) {
-        lastActionTime = millis();
-        animationStep++;
-        digitalWrite(BLUE_LED, LOW);
-        digitalWrite(GREEN_LED, LOW);
-        digitalWrite(ORANGE_LED, LOW);
-        digitalWrite(RED_LED, LOW);
-        switch (subMenuIndex) {
-          case 0:
-            if (animationStep > 5) animationStep = 0;
-            if (animationStep == 0) digitalWrite(BLUE_LED, HIGH);
-            if (animationStep == 1) digitalWrite(GREEN_LED, HIGH);
-            if (animationStep == 2) digitalWrite(ORANGE_LED, HIGH);
-            if (animationStep == 3) digitalWrite(RED_LED, HIGH);
-            if (animationStep == 4) digitalWrite(ORANGE_LED, HIGH);
-            if (animationStep == 5) digitalWrite(GREEN_LED, HIGH);
-            break;
-          case 1:
-            if (animationStep > 4) animationStep = 0;
-            if (animationStep >= 1) digitalWrite(BLUE_LED, HIGH);
-            if (animationStep >= 2) digitalWrite(GREEN_LED, HIGH);
-            if (animationStep >= 3) digitalWrite(ORANGE_LED, HIGH);
-            if (animationStep >= 4) digitalWrite(RED_LED, HIGH);
-            break;
-          case 2:
-            if (animationStep > 3) animationStep = 0;
-            if (animationStep == 0) { digitalWrite(BLUE_LED, HIGH); digitalWrite(RED_LED, HIGH); }
-            if (animationStep == 1) { digitalWrite(GREEN_LED, HIGH); digitalWrite(ORANGE_LED, HIGH); }
-            if (animationStep == 2) { digitalWrite(ORANGE_LED, HIGH); digitalWrite(GREEN_LED, HIGH); }
-            if (animationStep == 3) { digitalWrite(RED_LED, HIGH); digitalWrite(BLUE_LED, HIGH); }
-            break;
-          case 3:
-            if (animationStep > 1) animationStep = 0;
-            if (animationStep == 0) {
-              digitalWrite(BLUE_LED, HIGH);
-              digitalWrite(GREEN_LED, HIGH);
-              digitalWrite(ORANGE_LED, HIGH);
-              digitalWrite(RED_LED, HIGH);
-            }
-            break;
-        }
-      }
-      break;
-  }
-}
+---
 
+## How to Use
+
+1.  **Power On:** The device will show a "WELCOME" splash screen and then load the Main Menu.
+2.  **Main Menu:**
+    * **Next Button:** Scrolls down (Blink -> Toggle -> Animation).
+    * **Previous Button:** Scrolls up.
+    * **Enter Button:** Selects the highlighted option and moves to its Sub-Menu.
+3.  **Sub-Menu:**
+    * **Next Button:** Scrolls down the list of options (e.g., Blue LED, Green LED, etc., or Scanner, Fill Up, etc.).
+    * **Previous Button:** Scrolls up. If at the first item, pressing "Previous" goes back to the Main Menu.
+    * **Enter Button:** Selects the highlighted action and moves to the Action Screen.
+4.  **Action Screen:**
+    * The selected action (blink, animation, or toggle) will begin immediately.
+    * The screen displays "Press Enter to go Back."
+    * **Enter Button:** Stops the action, turns off all LEDs, and returns you to the previous Sub-Menu.
